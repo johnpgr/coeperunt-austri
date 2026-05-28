@@ -8,7 +8,7 @@ set -e
 # =============================================================================
 BASE_FILES="main.cpp"
 COMMON_FLAGS="-nostdlib -fno-exceptions -fno-rtti -fno-stack-protector -fno-builtin -O3"
-OUTPUT_NAME="something2"
+OUTPUT_NAME="coeperunt-austri"
 
 # =============================================================================
 # Target Platform Auto-Detection
@@ -20,7 +20,7 @@ echo "Detected Host OS: $OS_NAME"
 
 if [[ "$OS_NAME" == *"MINGW"* || "$OS_NAME" == *"MSYS"* || "$OS_NAME" == *"CYGWIN"* ]]; then
     echo "Configuring build for Windows (PE Binary)..."
-    LINKER_FLAGS="-Wl,-e,no_crt_entry -lkernel32"
+    LINKER_FLAGS="-Wl,-entry:no_crt_entry -Wl,-subsystem:windows -lkernel32 -luser32"
     OUTPUT_BIN="${OUTPUT_NAME}.exe"
 else
     echo "Configuring build for Linux (ELF Binary)..."

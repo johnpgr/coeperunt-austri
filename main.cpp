@@ -1,7 +1,7 @@
 #include "core.h"
 
 #if defined(OS_WINDOWS)
-    #include "platform/platform_windows.cpp"
+    #include "platform/platform_win32.cpp"
 #elif defined(OS_LINUX)
     #include "platform/platform_linux.cpp"
 #endif

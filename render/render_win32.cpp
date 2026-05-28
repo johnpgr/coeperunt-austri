@@ -73,7 +73,7 @@ static GraphicsContext* __win32_init_graphics(PlatformWindow* window) NOEXCEPT {
         if (g_context.context) g_context.context->Release();
         if (g_context.swap_chain) g_context.swap_chain->Release();
         if (g_context.device) g_context.device->Release();
-        memset(&g_context, 0, sizeof(g_context));
+        g_context = {};
         return nullptr;
     }
     
@@ -151,7 +151,7 @@ static void __win32_destroy_graphics(GraphicsContext* context) NOEXCEPT {
     }
 }
 
-void render_init(RenderSystem* render) NOEXCEPT {
+void render_init(RenderApi* render) NOEXCEPT {
     if (render) {
         render->init    = __win32_init_graphics;
         render->clear   = __win32_clear_screen;

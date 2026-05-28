@@ -5,9 +5,10 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
-// External functions declared for debug log / exit
-extern void __stdcall OutputDebugStringA(const char* lpOutputString);
-extern void __stdcall ExitProcess(unsigned int uExitCode);
+// Custom symbols for no-stdlib environment
+extern "C" {
+    int _fltused = 0;
+}
 
 static void __win32_debug_log(const char* message) NOEXCEPT {
     if (message) {
@@ -16,7 +17,7 @@ static void __win32_debug_log(const char* message) NOEXCEPT {
 }
 
 static void __win32_debug_logv(const char* format, va_list args) NOEXCEPT {
-    char buf[16384];
+    char buf[2048];
     va_list args_copy;
     va_copy(args_copy, args);
     custom_vsnprintf(buf, sizeof(buf), format, args_copy);

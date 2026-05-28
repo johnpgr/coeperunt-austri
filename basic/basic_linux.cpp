@@ -91,7 +91,7 @@ static inline i64 __syscall4(i64 number, i64 a0, i64 a1, i64 a2) NOEXCEPT {
 
 static void __linux_debug_log(const char* message) NOEXCEPT {
     if (!message) return;
-    usize len = strlen(message);
+    usize len = string_len(message);
     __syscall4(SYS_WRITE, 2, (i64)message, (i64)len);
 }
 

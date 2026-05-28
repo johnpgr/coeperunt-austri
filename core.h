@@ -38,7 +38,7 @@ typedef int                b32;
 // ============================================================================
 // Custom String Utilities (No standard library dependencies)
 // ============================================================================
-inline constexpr usize strlen(const char* str) {
+inline constexpr usize string_len(const char* str) {
     usize len = 0;
     while (str && str[len] != '\0') {
         len++;
