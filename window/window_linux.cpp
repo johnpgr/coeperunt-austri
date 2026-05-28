@@ -1,4 +1,4 @@
-#include "window.h"
+#include "../platform/platform.h"
 
 #if defined(OS_LINUX)
 
@@ -17,7 +17,7 @@ struct PlatformWindow {
 // Global static instances for no-stdlib single-window architecture
 static PlatformWindow g_window = {};
 
-static PlatformWindow* __linux_create_window(const char* title, i32 width, i32 height) NOEXCEPT {
+static PlatformWindow* __linux_create_window(const char* title, i32 width, i32 height) noexcept {
     Display* display = XOpenDisplay(nullptr);
     if (!display) {
         return nullptr;
@@ -65,7 +65,7 @@ static PlatformWindow* __linux_create_window(const char* title, i32 width, i32 h
     return &g_window;
 }
 
-static void __linux_destroy_window(PlatformWindow* window) NOEXCEPT {
+static void __linux_destroy_window(PlatformWindow* window) noexcept {
     if (window && window->display) {
         if (window->window) {
             XDestroyWindow(window->display, window->window);
@@ -76,7 +76,7 @@ static void __linux_destroy_window(PlatformWindow* window) NOEXCEPT {
     }
 }
 
-static b8 __linux_poll_events(PlatformWindow* window, i32* out_width, i32* out_height, b8* out_quit) NOEXCEPT {
+static b8 __linux_poll_events(PlatformWindow* window, i32* out_width, i32* out_height, b8* out_quit) noexcept {
     if (!window || !window->display || !window->window) return false;
 
     b8 got_events = false;
@@ -101,14 +101,6 @@ static b8 __linux_poll_events(PlatformWindow* window, i32* out_width, i32* out_h
         }
     }
     return got_events;
-}
-
-void window_init(WindowApi* window) NOEXCEPT {
-    if (window) {
-        window->create  = __linux_create_window;
-        window->destroy = __linux_destroy_window;
-        window->poll    = __linux_poll_events;
-    }
 }
 
 #endif // OS_LINUX

@@ -14,4 +14,9 @@ AllowShortIfStatementsOnASingleLine: Never
 AlwaysBreakAfterReturnType: None
 AllowShortFunctionsOnASingleLine: None
 PenaltyReturnTypeOnItsOwnLine: 1000
-SpaceBeforeParens: Never
+AlignConsecutiveAssignments:
+  Enabled: true
+  AcrossEmptyLines: false
+  AcrossComments: true
+  AlignCompound: true
+  PadOperators: true

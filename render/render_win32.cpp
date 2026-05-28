@@ -1,4 +1,4 @@
-#include "render.h"
+#include "../platform/platform.h"
 
 #if defined(OS_WINDOWS)
 
@@ -14,8 +14,6 @@
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3dcompiler.lib")
-
-extern Basic basic;
 
 struct GraphicsContext {
     ID3D11Device* device;
@@ -51,18 +49,23 @@ static const char g_shader_source[] = {
     #embed "quads.hlsl"
 };
 
-static GraphicsContext* __win32_init_graphics(PlatformWindow* window) NOEXCEPT {
-    if (!window || !window->hwnd) return nullptr;
+static GraphicsContext* __win32_init_graphics(PlatformWindow* window) noexcept {
+    if (!window) return nullptr;
+    
+    // Opaque cast or get HWND (it's the first member of PlatformWindow)
+    HWND hwnd = *(HWND*)window;
+    i32 width = *(i32*)((char*)window + sizeof(HWND));
+    i32 height = *(i32*)((char*)window + sizeof(HWND) + sizeof(i32));
     
     DXGI_SWAP_CHAIN_DESC sc_desc = {};
     sc_desc.BufferCount = 1;
     sc_desc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    sc_desc.BufferDesc.Width = window->width;
-    sc_desc.BufferDesc.Height = window->height;
+    sc_desc.BufferDesc.Width = width;
+    sc_desc.BufferDesc.Height = height;
     sc_desc.BufferDesc.RefreshRate.Numerator = 60;
     sc_desc.BufferDesc.RefreshRate.Denominator = 1;
     sc_desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    sc_desc.OutputWindow = window->hwnd;
+    sc_desc.OutputWindow = hwnd;
     sc_desc.SampleDesc.Count = 1;
     sc_desc.Windowed = TRUE;
     
@@ -103,8 +106,8 @@ static GraphicsContext* __win32_init_graphics(PlatformWindow* window) NOEXCEPT {
         return nullptr;
     }
     
-    g_context.cached_width = window->width;
-    g_context.cached_height = window->height;
+    g_context.cached_width = width;
+    g_context.cached_height = height;
     
     // Compile and create Vertex Shader
     ID3DBlob* vs_blob = nullptr;
@@ -125,7 +128,7 @@ static GraphicsContext* __win32_init_graphics(PlatformWindow* window) NOEXCEPT {
     
     if (FAILED(hr_shader)) {
         if (error_blob) {
-            basic.printf("[Error] VS Compile Error: %s\n", (const char*)error_blob->GetBufferPointer());
+            core::printf("[Error] VS Compile Error: %s\n", (const char*)error_blob->GetBufferPointer());
             error_blob->Release();
         }
         return nullptr;
@@ -177,7 +180,7 @@ static GraphicsContext* __win32_init_graphics(PlatformWindow* window) NOEXCEPT {
     
     if (FAILED(hr_shader)) {
         if (error_blob) {
-            basic.printf("[Error] PS Compile Error: %s\n", (const char*)error_blob->GetBufferPointer());
+            core::printf("[Error] PS Compile Error: %s\n", (const char*)error_blob->GetBufferPointer());
             error_blob->Release();
         }
         return nullptr;
@@ -259,13 +262,16 @@ static GraphicsContext* __win32_init_graphics(PlatformWindow* window) NOEXCEPT {
 
 // Internal helper to handle resize dynamically inside clear/swap operations
 static void __win32_handle_resize(PlatformWindow* window, GraphicsContext* context) {
-    if (window->width != context->cached_width || window->height != context->cached_height) {
+    i32 width = *(i32*)((char*)window + sizeof(HWND));
+    i32 height = *(i32*)((char*)window + sizeof(HWND) + sizeof(i32));
+    
+    if (width != context->cached_width || height != context->cached_height) {
         if (context->render_target_view) {
             context->render_target_view->Release();
             context->render_target_view = nullptr;
         }
         
-        context->swap_chain->ResizeBuffers(0, window->width, window->height, DXGI_FORMAT_UNKNOWN, 0);
+        context->swap_chain->ResizeBuffers(0, width, height, DXGI_FORMAT_UNKNOWN, 0);
         
         ID3D11Texture2D* backbuffer = nullptr;
         HRESULT hr = context->swap_chain->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)&backbuffer);
@@ -274,12 +280,12 @@ static void __win32_handle_resize(PlatformWindow* window, GraphicsContext* conte
             backbuffer->Release();
         }
         
-        context->cached_width = window->width;
-        context->cached_height = window->height;
+        context->cached_width = width;
+        context->cached_height = height;
     }
 }
 
-static void __win32_clear_screen(GraphicsContext* context, f32 r, f32 g, f32 b, f32 a) NOEXCEPT {
+static void __win32_clear_screen(GraphicsContext* context, f32 r, f32 g, f32 b, f32 a) noexcept {
     if (context && context->context && context->render_target_view) {
         float clear_color[4] = { r, g, b, a };
         context->context->ClearRenderTargetView(context->render_target_view, clear_color);
@@ -295,7 +301,7 @@ static void __win32_clear_screen(GraphicsContext* context, f32 r, f32 g, f32 b, 
     }
 }
 
-static b8 __win32_upload_texture(GraphicsContext* context, const u8* pixels, i32 width, i32 height) NOEXCEPT {
+static b8 __win32_upload_texture(GraphicsContext* context, const u8* pixels, i32 width, i32 height) noexcept {
     if (!context || !context->device || !pixels || width <= 0 || height <= 0) return FALSE;
     
     // Release existing texture view if any
@@ -339,7 +345,7 @@ static b8 __win32_upload_texture(GraphicsContext* context, const u8* pixels, i32
 }
 
 // Generic Render Command Buffer submission, decoding, and GPU execution
-static void __win32_submit_frame(PlatformWindow* window, GraphicsContext* context, RenderCommandQueue queue) NOEXCEPT {
+static void __win32_submit_frame(PlatformWindow* window, GraphicsContext* context, RenderCommandQueue queue) noexcept {
     if (!window || !context || !context->context) return;
     
     // Automatically handle client window layout resizes
@@ -376,9 +382,7 @@ static void __win32_submit_frame(PlatformWindow* window, GraphicsContext* contex
         HRESULT hr = context->context->Map(context->instance_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped_inst);
         if (SUCCEEDED(hr)) {
             RenderCommandQuad* dest = (RenderCommandQuad*)mapped_inst.pData;
-            for (i32 i = 0; i < g_quad_count; ++i) {
-                dest[i] = g_quad_instances[i];
-            }
+            core::memcpy(dest, g_quad_instances, g_quad_count * sizeof(RenderCommandQuad));
             context->context->Unmap(context->instance_buffer, 0);
         } else {
             return;
@@ -399,9 +403,7 @@ static void __win32_submit_frame(PlatformWindow* window, GraphicsContext* contex
         hr = context->context->Map(context->constant_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped_const);
         if (SUCCEEDED(hr)) {
             f32* dest = (f32*)mapped_const.pData;
-            for (int i = 0; i < 16; ++i) {
-                dest[i] = projection[i];
-            }
+            core::memcpy(dest, projection, sizeof(projection));
             context->context->Unmap(context->constant_buffer, 0);
         } else {
             return;
@@ -438,7 +440,7 @@ static void __win32_submit_frame(PlatformWindow* window, GraphicsContext* contex
     context->swap_chain->Present(1, 0);
 }
 
-static void __win32_destroy_graphics(GraphicsContext* context) NOEXCEPT {
+static void __win32_destroy_graphics(GraphicsContext* context) noexcept {
     if (context) {
         if (context->vertex_shader) {
             context->vertex_shader->Release();
@@ -499,14 +501,4 @@ static void __win32_destroy_graphics(GraphicsContext* context) NOEXCEPT {
     }
 }
 
-void render_init(RenderApi* render) NOEXCEPT {
-    if (render) {
-        render->init           = __win32_init_graphics;
-        render->upload_texture = __win32_upload_texture;
-        render->submit_frame   = __win32_submit_frame;
-        render->destroy        = __win32_destroy_graphics;
-    }
-}
-
 #endif // OS_WINDOWS
-

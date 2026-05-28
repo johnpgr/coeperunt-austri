@@ -48,13 +48,13 @@ typedef struct RenderCommandQueue {
 } RenderCommandQueue;
 
 typedef struct RenderApi {
-    GraphicsContext* (*init)(PlatformWindow* window) NOEXCEPT;
-    b8 (*upload_texture)(GraphicsContext* context, const u8* pixels, i32 width, i32 height) NOEXCEPT;
-    void (*submit_frame)(PlatformWindow* window, GraphicsContext* context, RenderCommandQueue queue) NOEXCEPT;
-    void (*destroy)(GraphicsContext* context) NOEXCEPT;
+    GraphicsContext* (*init)(PlatformWindow* window) noexcept;
+    b8 (*upload_texture)(GraphicsContext* context, const u8* pixels, i32 width, i32 height) noexcept;
+    void (*submit_frame)(PlatformWindow* window, GraphicsContext* context, RenderCommandQueue queue) noexcept;
+    void (*destroy)(GraphicsContext* context) noexcept;
 } RenderApi;
 
-EXTERN_C void render_init(RenderApi* render) NOEXCEPT;
+EXTERN_C void render_init(RenderApi* render) noexcept;
 
 #endif // RENDER_H
 

@@ -7,11 +7,11 @@
 typedef struct PlatformWindow PlatformWindow;
 
 typedef struct WindowApi {
-    PlatformWindow* (*create)(const char* title, i32 width, i32 height) NOEXCEPT;
-    void (*destroy)(PlatformWindow* window) NOEXCEPT;
-    b8 (*poll)(PlatformWindow* window, i32* out_width, i32* out_height, b8* out_quit) NOEXCEPT;
+    PlatformWindow* (*create)(const char* title, i32 width, i32 height) noexcept;
+    void (*destroy)(PlatformWindow* window) noexcept;
+    b8 (*poll)(PlatformWindow* window, i32* out_width, i32* out_height, b8* out_quit) noexcept;
 } WindowApi;
 
-EXTERN_C void window_init(WindowApi* window) NOEXCEPT;
+EXTERN_C void window_init(WindowApi* window) noexcept;
 
 #endif // WINDOW_H

@@ -1,4 +1,4 @@
-#include "window.h"
+#include "../platform/platform.h"
 
 #if defined(OS_WINDOWS)
 
@@ -35,7 +35,7 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
     return DefWindowProcA(hwnd, uMsg, wParam, lParam);
 }
 
-static PlatformWindow* __win32_create_window(const char* title, i32 width, i32 height) NOEXCEPT {
+static PlatformWindow* __win32_create_window(const char* title, i32 width, i32 height) noexcept {
     HINSTANCE hinstance = GetModuleHandleA(nullptr);
     
     WNDCLASSEXA wc = {};
@@ -80,14 +80,14 @@ static PlatformWindow* __win32_create_window(const char* title, i32 width, i32 h
     return &g_window;
 }
 
-static void __win32_destroy_window(PlatformWindow* window) NOEXCEPT {
+static void __win32_destroy_window(PlatformWindow* window) noexcept {
     if (window && window->hwnd) {
         DestroyWindow(window->hwnd);
         window->hwnd = nullptr;
     }
 }
 
-static b8 __win32_poll_events(PlatformWindow* window, i32* out_width, i32* out_height, b8* out_quit) NOEXCEPT {
+static b8 __win32_poll_events(PlatformWindow* window, i32* out_width, i32* out_height, b8* out_quit) noexcept {
     if (!window || !window->hwnd) return false;
     
     MSG msg = {};
@@ -103,14 +103,6 @@ static b8 __win32_poll_events(PlatformWindow* window, i32* out_width, i32* out_h
     if (out_quit) *out_quit = window->should_close;
     
     return got_events;
-}
-
-void window_init(WindowApi* window) NOEXCEPT {
-    if (window) {
-        window->create  = __win32_create_window;
-        window->destroy = __win32_destroy_window;
-        window->poll    = __win32_poll_events;
-    }
 }
 
 #endif // OS_WINDOWS
