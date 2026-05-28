@@ -45,6 +45,96 @@ void autotile_set(u8 mask, SpriteID sprite) noexcept {
     g_autotile_lookup[mask] = sprite;
 }
 
+void autotile_setup_rules() noexcept {
+    for (i32 mask = 0; mask < 256; ++mask) {
+        b8 n  = (mask & (1 << 0)) != 0;
+        b8 e  = (mask & (1 << 1)) != 0;
+        b8 s  = (mask & (1 << 2)) != 0;
+        b8 w  = (mask & (1 << 3)) != 0;
+        b8 ne = (mask & (1 << 4)) != 0;
+        b8 se = (mask & (1 << 5)) != 0;
+        b8 sw = (mask & (1 << 6)) != 0;
+        b8 nw = (mask & (1 << 7)) != 0;
+
+        SpriteID sprite = SPRITE_DIRT; // Default fallback
+
+        if (!n && !e && !s && !w) {
+            sprite = SPRITE_TILE_R0_C0; // 1x1 Isolated
+        }
+        else if (!n && e && !s && !w) {
+            sprite = SPRITE_TILE_R4_C1; // Horizontal line Left end
+        }
+        else if (!n && !e && !s && w) {
+            sprite = SPRITE_TILE_R4_C3; // Horizontal line Right end
+        }
+        else if (!n && e && !s && w) {
+            sprite = SPRITE_TILE_R4_C2; // Horizontal line Middle
+        }
+        else if (n && !e && !s && !w) {
+            sprite = SPRITE_TILE_R3_C0; // Vertical line Bottom end
+        }
+        else if (!n && !e && s && !w) {
+            sprite = SPRITE_TILE_R1_C0; // Vertical line Top end
+        }
+        else if (n && !e && s && !w) {
+            sprite = SPRITE_TILE_R2_C0; // Vertical line Middle
+        }
+        else if (!n && e && s && !w) {
+            sprite = SPRITE_TILE_R0_C1; // Top-Left corner
+        }
+        else if (!n && !e && s && w) {
+            sprite = SPRITE_TILE_R0_C3; // Top-Right corner
+        }
+        else if (n && e && !s && !w) {
+            sprite = SPRITE_TILE_R2_C1; // Bottom-Left corner
+        }
+        else if (n && !e && !s && w) {
+            sprite = SPRITE_TILE_R2_C3; // Bottom-Right corner
+        }
+        else if (!n && e && s && w) {
+            sprite = SPRITE_TILE_R0_C2; // Top edge
+        }
+        else if (n && e && !s && w) {
+            sprite = SPRITE_TILE_R2_C2; // Bottom edge
+        }
+        else if (n && e && s && !w) {
+            sprite = SPRITE_TILE_R1_C1; // Left edge
+        }
+        else if (n && !e && s && w) {
+            sprite = SPRITE_TILE_R1_C3; // Right edge
+        }
+        else if (n && e && s && w) {
+            i32 empty_diagonals = 0;
+            if (!nw) empty_diagonals++;
+            if (!ne) empty_diagonals++;
+            if (!se) empty_diagonals++;
+            if (!sw) empty_diagonals++;
+
+            if (empty_diagonals == 0) {
+                sprite = SPRITE_TILE_R1_C2; // Solid center
+            }
+            else if (empty_diagonals == 1) {
+                if (!nw)      sprite = SPRITE_TILE_R3_C1; // Inner Top-Left
+                else if (!ne) sprite = SPRITE_TILE_R3_C3; // Inner Top-Right
+                else if (!sw) sprite = SPRITE_TILE_R5_C1; // Inner Bottom-Left
+                else if (!se) sprite = SPRITE_TILE_R5_C3; // Inner Bottom-Right
+            }
+            else if (empty_diagonals == 2) {
+                if (!nw && !ne)      sprite = SPRITE_TILE_R3_C2; // Inner Top
+                else if (!sw && !se) sprite = SPRITE_TILE_R5_C2; // Inner Bottom
+                else if (!nw && !sw) sprite = SPRITE_TILE_R3_C1;
+                else if (!ne && !se) sprite = SPRITE_TILE_R3_C3;
+                else                 sprite = SPRITE_TILE_R1_C2;
+            }
+            else {
+                sprite = SPRITE_TILE_R1_C2;
+            }
+        }
+
+        g_autotile_lookup[mask] = sprite;
+    }
+}
+
 Tile* tilemap_tile(Tilemap* map, i32 x, i32 y) noexcept {
     if (!map) return nullptr;
     if (x < 0 || y < 0 || x >= map->width || y >= map->height) return nullptr;

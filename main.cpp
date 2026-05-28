@@ -111,6 +111,7 @@ MAIN {
     Tilemap tilemap = {};
     tilemap_init(&tilemap);
     autotile_init(SPRITE_DIRT);
+    autotile_setup_rules();
 
     static u8 render_command_buffer[1024 * 1024];
     RenderCommandQueue queue = {};

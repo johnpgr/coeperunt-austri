@@ -30,6 +30,7 @@ struct Tilemap {
 
 void autotile_init(SpriteID fill) noexcept;
 void autotile_set(u8 mask, SpriteID sprite) noexcept;
+void autotile_setup_rules() noexcept;
 
 Tile* tilemap_tile(Tilemap* map, i32 x, i32 y) noexcept;
 void tilemap_set(Tilemap* map, i32 x, i32 y, u8 type) noexcept;
