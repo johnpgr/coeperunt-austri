@@ -12,6 +12,11 @@ struct PlatformWindow {
     Atom wm_delete_window;
     i32 width;
     i32 height;
+    i32 mouse_x;
+    i32 mouse_y;
+    b8 mouse_left_down;
+    b8 mouse_right_down;
+    b8 should_close;
 };
 
 // Global static instances for no-stdlib single-window architecture
@@ -43,7 +48,7 @@ static PlatformWindow* __linux_create_window(const char* title, i32 width, i32 h
 
     XSetWindowAttributes swa = {};
     swa.colormap = cmap;
-    swa.event_mask = ExposureMask | KeyPressMask | StructureNotifyMask;
+    swa.event_mask = ExposureMask | KeyPressMask | StructureNotifyMask | ButtonPressMask | ButtonReleaseMask | PointerMotionMask;
 
     Window window = XCreateWindow(
         display, RootWindow(display, vi->screen),
@@ -66,6 +71,11 @@ static PlatformWindow* __linux_create_window(const char* title, i32 width, i32 h
     g_window.wm_delete_window = wm_delete_window;
     g_window.width = width;
     g_window.height = height;
+    g_window.mouse_x = 0;
+    g_window.mouse_y = 0;
+    g_window.mouse_left_down = false;
+    g_window.mouse_right_down = false;
+    g_window.should_close = false;
 
     return &g_window;
 }
@@ -81,7 +91,7 @@ static void __linux_destroy_window(PlatformWindow* window) noexcept {
     }
 }
 
-static b8 __linux_poll_events(PlatformWindow* window, i32* out_width, i32* out_height, b8* out_quit) noexcept {
+static b8 __linux_poll_events(PlatformWindow* window) noexcept {
     if (!window || !window->display || !window->window) return false;
 
     b8 got_events = false;
@@ -94,17 +104,45 @@ static b8 __linux_poll_events(PlatformWindow* window, i32* out_width, i32* out_h
             case ConfigureNotify: {
                 window->width = event.xconfigure.width;
                 window->height = event.xconfigure.height;
-                if (out_width) *out_width = window->width;
-                if (out_height) *out_height = window->height;
             } break;
 
             case ClientMessage: {
                 if ((Atom)event.xclient.data.l[0] == window->wm_delete_window) {
-                    if (out_quit) *out_quit = true;
+                    window->should_close = true;
+                }
+            } break;
+
+            case MotionNotify: {
+                window->mouse_x = event.xmotion.x;
+                window->mouse_y = event.xmotion.y;
+            } break;
+
+            case ButtonPress: {
+                if (event.xbutton.button == Button1) {
+                    window->mouse_left_down = true;
+                } else if (event.xbutton.button == Button3) {
+                    window->mouse_right_down = true;
+                }
+            } break;
+
+            case ButtonRelease: {
+                if (event.xbutton.button == Button1) {
+                    window->mouse_left_down = false;
+                } else if (event.xbutton.button == Button3) {
+                    window->mouse_right_down = false;
                 }
             } break;
         }
     }
+    
+    api.window.width = window->width;
+    api.window.height = window->height;
+    api.quit = window->should_close;
+    api.input.mouse.x = window->mouse_x;
+    api.input.mouse.y = window->mouse_y;
+    api.input.mouse.left_down = window->mouse_left_down;
+    api.input.mouse.right_down = window->mouse_right_down;
+    
     return got_events;
 }
 

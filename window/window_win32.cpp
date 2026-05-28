@@ -6,11 +6,16 @@
 #define WIN32_LEAN_AND_MEAN
 // TODO(maybe): Remove windows.h import and load the win32 library functions dynamically
 #include <windows.h>
+#include <windowsx.h>
 
 struct PlatformWindow {
     HWND hwnd;
     i32 width;
     i32 height;
+    i32 mouse_x;
+    i32 mouse_y;
+    b8 mouse_left_down;
+    b8 mouse_right_down;
     b8 should_close;
 };
 
@@ -29,6 +34,36 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
         case WM_SIZE: {
             g_window.width = LOWORD(lParam);
             g_window.height = HIWORD(lParam);
+            return 0;
+        } break;
+
+        case WM_MOUSEMOVE: {
+            g_window.mouse_x = GET_X_LPARAM(lParam);
+            g_window.mouse_y = GET_Y_LPARAM(lParam);
+            return 0;
+        } break;
+
+        case WM_LBUTTONDOWN: {
+            g_window.mouse_left_down = true;
+            SetCapture(hwnd);
+            return 0;
+        } break;
+
+        case WM_LBUTTONUP: {
+            g_window.mouse_left_down = false;
+            ReleaseCapture();
+            return 0;
+        } break;
+
+        case WM_RBUTTONDOWN: {
+            g_window.mouse_right_down = true;
+            SetCapture(hwnd);
+            return 0;
+        } break;
+
+        case WM_RBUTTONUP: {
+            g_window.mouse_right_down = false;
+            ReleaseCapture();
             return 0;
         } break;
     }
@@ -82,6 +117,10 @@ static PlatformWindow* __win32_create_window(const char* title, i32 width, i32 h
     g_window.hwnd = hwnd;
     g_window.width = width;
     g_window.height = height;
+    g_window.mouse_x = 0;
+    g_window.mouse_y = 0;
+    g_window.mouse_left_down = false;
+    g_window.mouse_right_down = false;
     g_window.should_close = false;
     
     return &g_window;
@@ -94,7 +133,7 @@ static void __win32_destroy_window(PlatformWindow* window) noexcept {
     }
 }
 
-static b8 __win32_poll_events(PlatformWindow* window, i32* out_width, i32* out_height, b8* out_quit) noexcept {
+static b8 __win32_poll_events(PlatformWindow* window) noexcept {
     if (!window || !window->hwnd) return false;
     
     MSG msg = {};
@@ -105,9 +144,13 @@ static b8 __win32_poll_events(PlatformWindow* window, i32* out_width, i32* out_h
         got_events = true;
     }
     
-    if (out_width) *out_width = window->width;
-    if (out_height) *out_height = window->height;
-    if (out_quit) *out_quit = window->should_close;
+    api.window.width = window->width;
+    api.window.height = window->height;
+    api.quit = window->should_close;
+    api.input.mouse.x = window->mouse_x;
+    api.input.mouse.y = window->mouse_y;
+    api.input.mouse.left_down = window->mouse_left_down;
+    api.input.mouse.right_down = window->mouse_right_down;
     
     return got_events;
 }

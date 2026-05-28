@@ -56,6 +56,68 @@ typedef struct RenderApi {
 
 EXTERN_C void render_init(RenderApi* render) noexcept;
 
+// ============================================================================
+// Render Queue Helper Functions
+// ============================================================================
+static inline void push_clear(RenderCommandQueue* queue, f32 r, f32 g, f32 b, f32 a) {
+    usize cmd_size = sizeof(RenderCommandHeader) + sizeof(RenderCommandClear);
+    if (queue->size + cmd_size > queue->capacity)
+        return;
+
+    RenderCommandHeader* header =
+        (RenderCommandHeader*)(queue->buffer + queue->size);
+    header->kind = RENDER_COMMAND_CLEAR;
+    header->size = (u32)cmd_size;
+
+    RenderCommandClear* payload =
+        (RenderCommandClear*)(queue->buffer + queue->size +
+                              sizeof(RenderCommandHeader));
+    payload->r = r;
+    payload->g = g;
+    payload->b = b;
+    payload->a = a;
+
+    queue->size += cmd_size;
+}
+
+static inline void push_quad(
+    RenderCommandQueue* queue, TextureRegion region,
+    f32 x, f32 y,
+    f32 scale_x, f32 scale_y, f32 rotation,
+    f32 origin_x, f32 origin_y,
+    f32 r, f32 g, f32 b, f32 a
+) {
+    usize cmd_size = sizeof(RenderCommandHeader) + sizeof(RenderCommandQuad);
+    if (queue->size + cmd_size > queue->capacity)
+        return;
+
+    RenderCommandHeader* header =
+        (RenderCommandHeader*)(queue->buffer + queue->size);
+    header->kind = RENDER_COMMAND_QUAD;
+    header->size = (u32)cmd_size;
+
+    RenderCommandQuad* payload =
+        (RenderCommandQuad*)(queue->buffer + queue->size +
+                             sizeof(RenderCommandHeader));
+    payload->pos_x    = x;
+    payload->pos_y    = y;
+    payload->scale_x  = scale_x * region.width;
+    payload->scale_y  = scale_y * region.height;
+    payload->origin_x = origin_x;
+    payload->origin_y = origin_y;
+    payload->uv_x     = region.u0;
+    payload->uv_y     = region.v0;
+    payload->uv_w     = region.u1 - region.u0;
+    payload->uv_h     = region.v1 - region.v0;
+    payload->rotation = rotation;
+    payload->color_r  = r;
+    payload->color_g  = g;
+    payload->color_b  = b;
+    payload->color_a  = a;
+
+    queue->size += cmd_size;
+}
+
 #endif // RENDER_H
 
 

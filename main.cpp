@@ -1,7 +1,7 @@
 /**
-* TODO: auto-tiling with the tileset we have, using bitmasking to determine
-* which tile variation to use based on neighboring tiles
-*/
+ * TODO: auto-tiling with the tileset we have, using bitmasking to determine
+ * which tile variation to use based on neighboring tiles
+ */
 
 #include "core.h"
 
@@ -15,76 +15,13 @@
 
 PlatformApi api;
 
+#include "sprites.h"
+#include "tiles.h"
+#include "tiles.cpp"
+
 #if defined(OS_LINUX)
 EXTERN_C char** environ;
 #endif
-
-static void push_clear(RenderCommandQueue* queue, f32 r, f32 g, f32 b, f32 a) {
-    usize cmd_size = sizeof(RenderCommandHeader) + sizeof(RenderCommandClear);
-    if (queue->size + cmd_size > queue->capacity)
-        return;
-
-    RenderCommandHeader* header =
-        (RenderCommandHeader*)(queue->buffer + queue->size);
-    header->kind = RENDER_COMMAND_CLEAR;
-    header->size = (u32)cmd_size;
-
-    RenderCommandClear* payload =
-        (RenderCommandClear*)(queue->buffer + queue->size +
-                              sizeof(RenderCommandHeader));
-    payload->r = r;
-    payload->g = g;
-    payload->b = b;
-    payload->a = a;
-
-    queue->size += cmd_size;
-}
-
-static void push_quad(
-    RenderCommandQueue* queue,
-    TextureRegion region,
-    f32 x,
-    f32 y,
-    f32 scale_x,
-    f32 scale_y,
-    f32 rotation,
-    f32 origin_x,
-    f32 origin_y,
-    f32 r,
-    f32 g,
-    f32 b,
-    f32 a
-) {
-    usize cmd_size = sizeof(RenderCommandHeader) + sizeof(RenderCommandQuad);
-    if (queue->size + cmd_size > queue->capacity)
-        return;
-
-    RenderCommandHeader* header =
-        (RenderCommandHeader*)(queue->buffer + queue->size);
-    header->kind = RENDER_COMMAND_QUAD;
-    header->size = (u32)cmd_size;
-
-    RenderCommandQuad* payload =
-        (RenderCommandQuad*)(queue->buffer + queue->size +
-                             sizeof(RenderCommandHeader));
-    payload->pos_x    = x;
-    payload->pos_y    = y;
-    payload->scale_x  = scale_x * region.width;
-    payload->scale_y  = scale_y * region.height;
-    payload->origin_x = origin_x;
-    payload->origin_y = origin_y;
-    payload->uv_x     = region.u0;
-    payload->uv_y     = region.v0;
-    payload->uv_w     = region.u1 - region.u0;
-    payload->uv_h     = region.v1 - region.v0;
-    payload->rotation = rotation;
-    payload->color_r  = r;
-    payload->color_g  = g;
-    payload->color_b  = b;
-    payload->color_a  = a;
-
-    queue->size += cmd_size;
-}
 
 MAIN {
 #if defined(OS_LINUX)
@@ -96,9 +33,16 @@ MAIN {
     platform_init(&api);
     core::printf("[System] Platform API initialized.\n");
 
-    core::printf("[System] Creating window (800x600)...\n");
+    api.window.width  = 800;
+    api.window.height = 600;
+    core::printf(
+        "[System] Creating window (%dx%d)...\n",
+        api.window.width,
+        api.window.height
+    );
 
-    PlatformWindow* windowptr = api.window.create("Unnamed Game", 800, 600);
+    PlatformWindow* windowptr =
+        api.window.create("Unnamed Game", api.window.width, api.window.height);
     if (!windowptr) {
         core::printf("[Error] Failed to create window!\n");
         core::exit(1);
@@ -134,6 +78,9 @@ MAIN {
         atlas_image.height
     );
 
+    i32 atlas_width  = atlas_image.width;
+    i32 atlas_height = atlas_image.height;
+
     core::printf("[System] Uploading texture to GPU...\n");
     b8 upload_success = api.render.upload_texture(
         context,
@@ -155,103 +102,71 @@ MAIN {
 
     core::printf("[System] Texture upload complete.\n");
 
-    // Define 32x32 texture region slices from the 384x256 forest tileset
-    // Grass Variation A (Row 5, Column 1): x=0, y=128
-    TextureRegion grass_a = {};
-    grass_a.u0            = 0.0f / 384.0f;
-    grass_a.v0            = 128.0f / 256.0f;
-    grass_a.u1            = 32.0f / 384.0f;
-    grass_a.v1            = 160.0f / 256.0f;
-    grass_a.width         = 32;
-    grass_a.height        = 32;
+    TextureRegion sprite_regions[SPRITE_COUNT] = {};
+    for (i32 i = 0; i < SPRITE_COUNT; ++i) {
+        sprite_regions[i] =
+            sprite_region((SpriteID)i, atlas_width, atlas_height);
+    }
 
-    // Grass Variation B (Row 5, Column 2): x=32, y=128
-    TextureRegion grass_b = {};
-    grass_b.u0            = 32.0f / 384.0f;
-    grass_b.v0            = 128.0f / 256.0f;
-    grass_b.u1            = 64.0f / 384.0f;
-    grass_b.v1            = 160.0f / 256.0f;
-    grass_b.width         = 32;
-    grass_b.height        = 32;
-
-    // Grass Variation C (Row 5, Column 3): x=64, y=128
-    TextureRegion grass_c = {};
-    grass_c.u0            = 64.0f / 384.0f;
-    grass_c.v0            = 128.0f / 256.0f;
-    grass_c.u1            = 96.0f / 384.0f;
-    grass_c.v1            = 160.0f / 256.0f;
-    grass_c.width         = 32;
-    grass_c.height        = 32;
-
-    // Dirt/Underground Tile (Row 2, Column 3): x=64, y=32
-    TextureRegion dirt = {};
-    dirt.u0            = 64.0f / 384.0f;
-    dirt.v0            = 32.0f / 256.0f;
-    dirt.u1            = 96.0f / 384.0f;
-    dirt.v1            = 64.0f / 256.0f;
-    dirt.width         = 32;
-    dirt.height        = 32;
+    Tilemap tilemap = {};
+    tilemap_init(&tilemap);
+    autotile_init(SPRITE_DIRT);
 
     static u8 render_command_buffer[1024 * 1024];
     RenderCommandQueue queue = {};
     queue.buffer             = render_command_buffer;
     queue.capacity           = sizeof(render_command_buffer);
 
-    i32 width  = 800;
-    i32 height = 600;
-    b8 quit    = false;
+    api.quit = false;
 
     core::printf(
         "[System] Subsystem initialized successfully. Running frame loop "
         "(Window: %p, Width: %d, Height: %d)...\n",
         windowptr,
-        width,
-        height
+        api.window.width,
+        api.window.height
     );
 
-    while (!quit) {
-        api.window.poll(windowptr, &width, &height, &quit);
+    while (!api.quit) {
+        api.window.poll(windowptr);
+
+        if (api.input.mouse.left_down) {
+            i32 cell_x = api.input.mouse.x / TILE_DRAW_SIZE;
+            i32 cell_y = api.input.mouse.y / TILE_DRAW_SIZE;
+            tilemap_set(&tilemap, cell_x, cell_y, TILE_SOLID);
+        } else if (api.input.mouse.right_down) {
+            i32 cell_x = api.input.mouse.x / TILE_DRAW_SIZE;
+            i32 cell_y = api.input.mouse.y / TILE_DRAW_SIZE;
+            tilemap_set(&tilemap, cell_x, cell_y, TILE_EMPTY);
+        }
 
         queue.size = 0;
         push_clear(&queue, 0.45f, 0.68f, 0.90f, 1.0f);
 
-        for (int x = 0; x < 5; ++x) {
-            f32 tile_x = (f32)(240 + x * 64);
+        i32 draw_cols = api.window.width / TILE_DRAW_SIZE;
+        i32 draw_rows = api.window.height / TILE_DRAW_SIZE;
+        if (draw_cols > tilemap.width) draw_cols = tilemap.width;
+        if (draw_rows > tilemap.height) draw_rows = tilemap.height;
 
-            TextureRegion grass_tile =
-                (x % 3 == 0) ? grass_a : ((x % 3 == 1) ? grass_b : grass_c);
+        for (i32 y = 0; y < draw_rows; ++y) {
+            for (i32 x = 0; x < draw_cols; ++x) {
+                Tile* tile = tilemap_tile(&tilemap, x, y);
+                if (!tile || tile->type == TILE_EMPTY) {
+                    continue;
+                }
 
-            push_quad(
-                &queue,
-                grass_tile,
-                tile_x,
-                300.0f,
-                2.0f,
-                2.0f,
-                0.0f,
-                0.0f,
-                0.0f,
-                1.0f,
-                1.0f,
-                1.0f,
-                1.0f
-            );
+                TextureRegion region = sprite_regions[tile->sprite];
+                f32 pos_x            = (f32)(x * TILE_DRAW_SIZE);
+                f32 pos_y            = (f32)(y * TILE_DRAW_SIZE);
 
-            push_quad(
-                &queue,
-                dirt,
-                tile_x,
-                364.0f,
-                2.0f,
-                2.0f,
-                0.0f,
-                0.0f,
-                0.0f,
-                1.0f,
-                1.0f,
-                1.0f,
-                1.0f
-            );
+                push_quad(&queue, region,
+                    pos_x, pos_y,
+                    (f32)TILE_DRAW_SCALE,
+                    (f32)TILE_DRAW_SCALE,
+                    0.0f, 0.0f, 0.0f,
+                    1.0f, 1.0f, 1.0f, 1.0f
+                );
+            }
         }
 
         api.render.submit_frame(windowptr, context, queue);
