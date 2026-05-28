@@ -45,7 +45,7 @@ static PlatformWindow* __win32_create_window(const char* title, i32 width, i32 h
     wc.hInstance = hinstance;
     wc.hCursor = LoadCursorA(nullptr, (LPCSTR)IDC_ARROW);
     wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-    wc.lpszClassName = "AntigravitySubsystemClass";
+    wc.lpszClassName = "UnnamedGameWindowClass";
     
     if (!RegisterClassExA(&wc)) {
         return nullptr;

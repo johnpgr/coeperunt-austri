@@ -20,14 +20,26 @@ typedef __builtin_va_list va_list;
 #define va_end(ap) __builtin_va_end(ap)
 #endif
 
+typedef struct LoadedImage {
+    u8* pixels;
+    i32 width;
+    i32 height;
+    void* file_memory;
+} LoadedImage;
+
 typedef struct Basic {
     void (*print)(const char* message) NOEXCEPT;
     void (*printf)(const char* format, ...) NOEXCEPT;
     void (*printv)(const char* format, va_list args) NOEXCEPT;
     void (*exit)(i32 status) NOEXCEPT;
+    
+    // Generic Asset Loading
+    LoadedImage (*load_bmp)(const char* filepath) NOEXCEPT;
+    void (*free_bmp)(LoadedImage image) NOEXCEPT;
 } Basic;
 
 EXTERN_C void basic_init(Basic* basic) NOEXCEPT;
+
 
 // ============================================================================
 // Freestanding custom_vsnprintf Formatter Helper

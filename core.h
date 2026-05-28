@@ -38,6 +38,11 @@ typedef int                b32;
 // ============================================================================
 // Custom String Utilities (No standard library dependencies)
 // ============================================================================
+
+/**
+ * TODO: Create our own String type, that does not heap allocate and
+ * that is going to be O(1) for length retrieval, and O(1) for slicing (substrings).
+ */
 inline constexpr usize string_len(const char* str) {
     usize len = 0;
     while (str && str[len] != '\0') {
@@ -50,9 +55,62 @@ inline constexpr usize string_len(const char* str) {
 // Unified Entry Point
 // ============================================================================
 #if defined(OS_WINDOWS)
-    #define START EXTERN_C void no_crt_entry()
+    #define MAIN EXTERN_C void no_crt_entry()
 #elif defined(OS_LINUX)
-    #define START EXTERN_C void nomain_entry(int argc, char** argv, char** envp)
+    #define MAIN EXTERN_C void nomain_entry(int argc, char** argv, char** envp)
+#endif
+
+// ============================================================================
+// Freestanding Trigonometric Helpers
+// ============================================================================
+#define PI 3.14159265358979323846f
+#define TWO_PI 6.28318530717958647692f
+#define HALF_PI 1.57079632679489661923f
+
+static inline f32 sin(f32 x) {
+    // 1. Range reduction to [-PI, PI]
+    while (x > PI)  x -= TWO_PI;
+    while (x < -PI) x += TWO_PI;
+    
+    // 2. Taylor series approximation: x - x^3/6 + x^5/120 - x^7/5040 + x^9/362880
+    f32 x2 = x * x;
+    f32 x3 = x * x2;
+    f32 x5 = x3 * x2;
+    f32 x7 = x5 * x2;
+    f32 x9 = x7 * x2;
+    
+    return x - (x3 * 0.166666666667f) + (x5 * 0.008333333333f) - (x7 * 0.000198412698f) + (x9 * 0.000002755731f);
+}
+
+static inline f32 cos(f32 x) {
+    return sin(x + HALF_PI);
+}
+
+// ============================================================================
+// Freestanding CRT Overrides (No-stdlib compiler safeties)
+// ============================================================================
+#if defined(OS_WINDOWS)
+EXTERN_C {
+    #if defined(_MSC_VER) && !defined(__clang__)
+        #pragma function(memset)
+    #endif
+    void* memset(void* dest, int c, usize size) {
+        unsigned char* p = (unsigned char*)dest;
+        while (size--) *p++ = (unsigned char)c;
+        return dest;
+    }
+
+    #if defined(_MSC_VER) && !defined(__clang__)
+        #pragma function(memcpy)
+    #endif
+    void* memcpy(void* dest, const void* src, usize size) {
+        unsigned char* d = (unsigned char*)dest;
+        const unsigned char* s = (const unsigned char*)src;
+        while (size--) *d++ = *s++;
+        return dest;
+    }
+}
 #endif
 
 #endif // CORE_H
+

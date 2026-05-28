@@ -7,7 +7,7 @@ set -e
 # Build Configuration Facade
 # =============================================================================
 BASE_FILES="main.cpp"
-COMMON_FLAGS="-nostdlib -fno-exceptions -fno-rtti -fno-stack-protector -fno-builtin -O3"
+COMMON_FLAGS="-Wno-c23-extensions -nostdlib -fno-exceptions -fno-rtti -fno-stack-protector -fno-builtin -O3 -std=c++23"
 OUTPUT_NAME="coeperunt-austri"
 
 # =============================================================================
