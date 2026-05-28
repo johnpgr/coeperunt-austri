@@ -18,6 +18,8 @@ typedef struct LoadedImage {
 typedef struct FileContent {
     void* data;
     usize size;
+    void* file_memory;
+    usize file_memory_size;
 } FileContent;
 
 typedef struct TextureRegion {

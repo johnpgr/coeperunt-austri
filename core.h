@@ -38,6 +38,33 @@ typedef bool               b8;
 typedef int                b32;
 
 // ============================================================================
+// Memory Arena (Linear Allocator)
+// ============================================================================
+struct MemoryArena {
+    u8* base;
+    usize size;
+    usize used;
+};
+
+#define push_struct(arena, type) (type *)push_size_(arena, sizeof(type))
+#define push_array(arena, count, type) (type *)push_size_(arena, (count) * sizeof(type))
+
+inline void*
+push_size_(MemoryArena* arena, usize size) {
+    if (!arena || !arena->base || size == 0) {
+        return 0;
+    }
+
+    if (arena->used + size > arena->size) {
+        return 0;
+    }
+
+    void* result = arena->base + arena->used;
+    arena->used += size;
+    return result;
+}
+
+// ============================================================================
 // Custom String Utilities, Trigonometrics, Memory & IO (Freestanding core namespace)
 // ============================================================================
 

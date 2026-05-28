@@ -39,18 +39,19 @@ struct GraphicsContext {
 // Global static instances for no-stdlib single-window architecture
 static GraphicsContext g_context = {};
 
+static void __win32_destroy_graphics(GraphicsContext* context) noexcept;
+
+#define QUAD_SHADER_PATH "assets/shaders/quads.hlsl"
+
 // Max quads enqueued per frame
 #define MAX_QUADS 10000
 static RenderCommandQuad g_quad_instances[MAX_QUADS];
 static i32 g_quad_count = 0;
 
-// HLSL Shaders embedded at compile time using C++23 #embed
-static const char g_shader_source[] = {
-    #embed "quads.hlsl"
-};
-
 static GraphicsContext* __win32_init_graphics(PlatformWindow* window) noexcept {
     if (!window) return nullptr;
+
+    core::printf("[System] Win32 renderer init start.\n");
     
     // Opaque cast or get HWND (it's the first member of PlatformWindow)
     HWND hwnd = *(HWND*)window;
@@ -90,6 +91,8 @@ static GraphicsContext* __win32_init_graphics(PlatformWindow* window) noexcept {
     if (FAILED(hr)) {
         return nullptr;
     }
+
+    core::printf("[System] D3D11 device and swap chain created.\n");
     
     ID3D11Texture2D* backbuffer = nullptr;
     hr = g_context.swap_chain->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)&backbuffer);
@@ -105,16 +108,33 @@ static GraphicsContext* __win32_init_graphics(PlatformWindow* window) noexcept {
         g_context = {};
         return nullptr;
     }
+
+    core::printf("[System] Backbuffer render target created.\n");
     
     g_context.cached_width = width;
     g_context.cached_height = height;
+
+    FileContent shader_source = api.fs.read_entire_file(QUAD_SHADER_PATH);
+    if (!shader_source.data || shader_source.size == 0) {
+        core::printf("[Error] Failed to read shader file: %s\n", QUAD_SHADER_PATH);
+        __win32_destroy_graphics(&g_context);
+        g_context = {};
+        return nullptr;
+    }
+
+    core::printf(
+        "[System] Shader source loaded: %s (%u bytes).\n",
+        QUAD_SHADER_PATH,
+        (u32)shader_source.size
+    );
     
     // Compile and create Vertex Shader
     ID3DBlob* vs_blob = nullptr;
     ID3DBlob* error_blob = nullptr;
+    core::printf("[System] Compiling vertex shader...\n");
     HRESULT hr_shader = D3DCompile(
-        g_shader_source,
-        sizeof(g_shader_source),
+        shader_source.data,
+        shader_source.size,
         nullptr,
         nullptr,
         nullptr,
@@ -131,14 +151,24 @@ static GraphicsContext* __win32_init_graphics(PlatformWindow* window) noexcept {
             core::printf("[Error] VS Compile Error: %s\n", (const char*)error_blob->GetBufferPointer());
             error_blob->Release();
         }
+        api.fs.free_file_content(shader_source);
+        __win32_destroy_graphics(&g_context);
+        g_context = {};
         return nullptr;
     }
+
+    core::printf("[System] Vertex shader compiled.\n");
     
     hr = g_context.device->CreateVertexShader(vs_blob->GetBufferPointer(), vs_blob->GetBufferSize(), nullptr, &g_context.vertex_shader);
     if (FAILED(hr)) {
         vs_blob->Release();
+        api.fs.free_file_content(shader_source);
+        __win32_destroy_graphics(&g_context);
+        g_context = {};
         return nullptr;
     }
+
+    core::printf("[System] Vertex shader created.\n");
     
     // Create Input Layout matching RenderCommandQuad layout
     D3D11_INPUT_ELEMENT_DESC layout_desc[] = {
@@ -160,13 +190,21 @@ static GraphicsContext* __win32_init_graphics(PlatformWindow* window) noexcept {
     );
     vs_blob->Release();
     
-    if (FAILED(hr)) return nullptr;
+    if (FAILED(hr)) {
+        api.fs.free_file_content(shader_source);
+        __win32_destroy_graphics(&g_context);
+        g_context = {};
+        return nullptr;
+    }
+
+    core::printf("[System] Input layout created.\n");
     
     // Compile and create Pixel Shader
     ID3DBlob* ps_blob = nullptr;
+    core::printf("[System] Compiling pixel shader...\n");
     hr_shader = D3DCompile(
-        g_shader_source,
-        sizeof(g_shader_source),
+        shader_source.data,
+        shader_source.size,
         nullptr,
         nullptr,
         nullptr,
@@ -183,12 +221,26 @@ static GraphicsContext* __win32_init_graphics(PlatformWindow* window) noexcept {
             core::printf("[Error] PS Compile Error: %s\n", (const char*)error_blob->GetBufferPointer());
             error_blob->Release();
         }
+        api.fs.free_file_content(shader_source);
+        __win32_destroy_graphics(&g_context);
+        g_context = {};
         return nullptr;
     }
+
+    core::printf("[System] Pixel shader compiled.\n");
     
     hr = g_context.device->CreatePixelShader(ps_blob->GetBufferPointer(), ps_blob->GetBufferSize(), nullptr, &g_context.pixel_shader);
     ps_blob->Release();
-    if (FAILED(hr)) return nullptr;
+    if (FAILED(hr)) {
+        api.fs.free_file_content(shader_source);
+        __win32_destroy_graphics(&g_context);
+        g_context = {};
+        return nullptr;
+    }
+
+    core::printf("[System] Pixel shader created.\n");
+
+    api.fs.free_file_content(shader_source);
     
     // Create Instance Buffer (Dynamic Vertex Buffer)
     D3D11_BUFFER_DESC inst_desc = {};
@@ -199,6 +251,8 @@ static GraphicsContext* __win32_init_graphics(PlatformWindow* window) noexcept {
     
     hr = g_context.device->CreateBuffer(&inst_desc, nullptr, &g_context.instance_buffer);
     if (FAILED(hr)) return nullptr;
+
+    core::printf("[System] Instance buffer created.\n");
     
     // Create Constant Buffer for projection matrix
     D3D11_BUFFER_DESC const_desc = {};
@@ -209,6 +263,8 @@ static GraphicsContext* __win32_init_graphics(PlatformWindow* window) noexcept {
     
     hr = g_context.device->CreateBuffer(&const_desc, nullptr, &g_context.constant_buffer);
     if (FAILED(hr)) return nullptr;
+
+    core::printf("[System] Constant buffer created.\n");
     
     // Create Sampler State ( crisp Nearest-Neighbor filtering for pixel art sprites )
     D3D11_SAMPLER_DESC samp_desc = {};
@@ -222,6 +278,8 @@ static GraphicsContext* __win32_init_graphics(PlatformWindow* window) noexcept {
     
     hr = g_context.device->CreateSamplerState(&samp_desc, &g_context.sampler_state);
     if (FAILED(hr)) return nullptr;
+
+    core::printf("[System] Sampler state created.\n");
     
     // Create Alpha Blend State
     D3D11_BLEND_DESC blend_desc = {};
@@ -238,6 +296,8 @@ static GraphicsContext* __win32_init_graphics(PlatformWindow* window) noexcept {
     
     hr = g_context.device->CreateBlendState(&blend_desc, &g_context.blend_state);
     if (FAILED(hr)) return nullptr;
+
+    core::printf("[System] Blend state created.\n");
     
     // Create Rasterizer State (Disable Backface Culling for 2D batcher)
     D3D11_RASTERIZER_DESC rast_desc = {};
@@ -247,6 +307,8 @@ static GraphicsContext* __win32_init_graphics(PlatformWindow* window) noexcept {
     
     hr = g_context.device->CreateRasterizerState(&rast_desc, &g_context.rasterizer_state);
     if (FAILED(hr)) return nullptr;
+
+    core::printf("[System] Rasterizer state created.\n");
     
     // Create Depth Stencil State (Disable Depth Testing for 2D painters algorithm)
     D3D11_DEPTH_STENCIL_DESC depth_desc = {};
@@ -256,6 +318,10 @@ static GraphicsContext* __win32_init_graphics(PlatformWindow* window) noexcept {
     
     hr = g_context.device->CreateDepthStencilState(&depth_desc, &g_context.depth_state);
     if (FAILED(hr)) return nullptr;
+
+    core::printf("[System] Depth state created.\n");
+
+    core::printf("[System] Win32 renderer init complete.\n");
     
     return &g_context;
 }

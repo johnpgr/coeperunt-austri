@@ -45,8 +45,35 @@ namespace core {
 // ============================================================================
 // File System Implementation
 // ============================================================================
+static MemoryArena __win32_arena_alloc(usize size) noexcept {
+    MemoryArena arena = {};
+    if (size == 0) {
+        return arena;
+    }
+
+    void* base = VirtualAlloc(nullptr, (SIZE_T)size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+    if (base) {
+        arena.base = (u8*)base;
+        arena.size = size;
+    }
+    return arena;
+}
+
+static void __win32_arena_release(MemoryArena* arena) noexcept {
+    if (arena && arena->base) {
+        VirtualFree(arena->base, 0, MEM_RELEASE);
+        arena->base = 0;
+        arena->size = 0;
+        arena->used = 0;
+    }
+}
+
 static FileContent __win32_read_entire_file(const char* filepath) noexcept {
     FileContent result = {};
+    if (!filepath) {
+        return result;
+    }
+
     HANDLE file = CreateFileA(filepath, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (file == INVALID_HANDLE_VALUE) {
         core::printf("[Error] Failed to open file: %s\n", filepath);
@@ -54,39 +81,106 @@ static FileContent __win32_read_entire_file(const char* filepath) noexcept {
     }
     
     LARGE_INTEGER size;
-    if (GetFileSizeEx(file, &size)) {
-        void* data = VirtualAlloc(nullptr, (SIZE_T)size.QuadPart, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-        if (data) {
-            DWORD bytes_read = 0;
-            if (ReadFile(file, data, (DWORD)size.QuadPart, &bytes_read, nullptr) && bytes_read == size.QuadPart) {
-                result.data = data;
-                result.size = (usize)size.QuadPart;
-            } else {
-                core::printf("[Error] Failed to read file content: %s\n", filepath);
-                VirtualFree(data, 0, MEM_RELEASE);
-            }
-        }
+    if (!GetFileSizeEx(file, &size)) {
+        core::printf("[Error] Failed to query file size: %s\n", filepath);
+        CloseHandle(file);
+        return result;
     }
+
+    if (size.QuadPart <= 0) {
+        CloseHandle(file);
+        return result;
+    }
+
+    if ((u64)size.QuadPart > (u64)(usize)-1) {
+        core::printf("[Error] File size overflow: %s\n", filepath);
+        CloseHandle(file);
+        return result;
+    }
+
+    usize file_size = (usize)size.QuadPart;
+    MemoryArena arena = __win32_arena_alloc(file_size);
+    if (!arena.base) {
+        core::printf("[Error] Failed to allocate file arena: %s\n", filepath);
+        CloseHandle(file);
+        return result;
+    }
+
+    void* data = push_size_(&arena, file_size);
+    if (!data) {
+        __win32_arena_release(&arena);
+        CloseHandle(file);
+        return result;
+    }
+
+    u8* dest = (u8*)data;
+    usize remaining = file_size;
+    while (remaining > 0) {
+        DWORD to_read = (remaining > 0xFFFFFFFFu) ? 0xFFFFFFFFu : (DWORD)remaining;
+        DWORD bytes_read = 0;
+        b8 ok = ReadFile(file, dest, to_read, &bytes_read, nullptr);
+        if (!ok || bytes_read == 0) {
+            core::printf("[Error] Failed to read file content: %s\n", filepath);
+            break;
+        }
+        dest += bytes_read;
+        remaining -= bytes_read;
+    }
+
     CloseHandle(file);
+    if (remaining != 0) {
+        __win32_arena_release(&arena);
+        return result;
+    }
+
+    result.data = data;
+    result.size = file_size;
+    result.file_memory = arena.base;
+    result.file_memory_size = arena.size;
     return result;
 }
 
 static b8 __win32_write_entire_file(const char* filepath, const void* data, usize size) noexcept {
+    if (!filepath || (!data && size > 0)) {
+        return false;
+    }
+
     HANDLE file = CreateFileA(filepath, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (file == INVALID_HANDLE_VALUE) {
         core::printf("[Error] Failed to open file for writing: %s\n", filepath);
         return false;
     }
     
-    DWORD bytes_written = 0;
-    b8 success = WriteFile(file, data, (DWORD)size, &bytes_written, nullptr) && (bytes_written == size);
+    usize total_written = 0;
+    const u8* src = (const u8*)data;
+    b8 success = true;
+    while (total_written < size) {
+        usize remaining = size - total_written;
+        DWORD to_write = (remaining > 0xFFFFFFFFu) ? 0xFFFFFFFFu : (DWORD)remaining;
+
+        DWORD bytes_written = 0;
+        if (!WriteFile(file, src + total_written, to_write, &bytes_written, nullptr) || bytes_written == 0) {
+            core::printf("[Error] Failed to write file content: %s\n", filepath);
+            success = false;
+            break;
+        }
+        total_written += bytes_written;
+    }
+
+    if (success) {
+        success = (total_written == size);
+    }
+
     CloseHandle(file);
     return success;
 }
 
 static void __win32_free_file_content(FileContent content) noexcept {
-    if (content.data) {
-        VirtualFree(content.data, 0, MEM_RELEASE);
+    if (content.file_memory) {
+        MemoryArena arena = {};
+        arena.base = (u8*)content.file_memory;
+        arena.size = content.file_memory_size;
+        __win32_arena_release(&arena);
     }
 }
 
@@ -189,23 +283,26 @@ static void __win32_free_bmp(LoadedImage image) noexcept {
 #include "../render/render_win32.cpp"
 
 void platform_init(PlatformApi* api) noexcept {
-    if (api) {
-        api->window.create  = __win32_create_window;
-        api->window.destroy = __win32_destroy_window;
-        api->window.poll    = __win32_poll_events;
-
-        api->render.init           = __win32_init_graphics;
-        api->render.upload_texture = __win32_upload_texture;
-        api->render.submit_frame   = __win32_submit_frame;
-        api->render.destroy        = __win32_destroy_graphics;
-
-        api->fs.read_entire_file  = __win32_read_entire_file;
-        api->fs.write_entire_file = __win32_write_entire_file;
-        api->fs.free_file_content = __win32_free_file_content;
-
-        api->media.load_bmp = __win32_load_bmp;
-        api->media.free_bmp = __win32_free_bmp;
+    if(!api) {
+        core::printf("[Error] Invalid platform API pointer\n");
+        return;
     }
+
+    api->window.create  = __win32_create_window;
+    api->window.destroy = __win32_destroy_window;
+    api->window.poll    = __win32_poll_events;
+
+    api->render.init           = __win32_init_graphics;
+    api->render.upload_texture = __win32_upload_texture;
+    api->render.submit_frame   = __win32_submit_frame;
+    api->render.destroy        = __win32_destroy_graphics;
+
+    api->fs.read_entire_file  = __win32_read_entire_file;
+    api->fs.write_entire_file = __win32_write_entire_file;
+    api->fs.free_file_content = __win32_free_file_content;
+
+    api->media.load_bmp = __win32_load_bmp;
+    api->media.free_bmp = __win32_free_bmp;
 }
 
 #endif // OS_WINDOWS

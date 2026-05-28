@@ -36,6 +36,7 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 }
 
 static PlatformWindow* __win32_create_window(const char* title, i32 width, i32 height) noexcept {
+    core::printf("[System] Win32 window init start (%dx%d).\n", width, height);
     HINSTANCE hinstance = GetModuleHandleA(nullptr);
     
     WNDCLASSEXA wc = {};
@@ -50,6 +51,8 @@ static PlatformWindow* __win32_create_window(const char* title, i32 width, i32 h
     if (!RegisterClassExA(&wc)) {
         return nullptr;
     }
+
+    core::printf("[System] Win32 window class registered.\n");
     
     RECT wr = { 0, 0, width, height };
     AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE);
@@ -68,9 +71,13 @@ static PlatformWindow* __win32_create_window(const char* title, i32 width, i32 h
     if (!hwnd) {
         return nullptr;
     }
+
+    core::printf("[System] Win32 window created.\n");
     
     ShowWindow(hwnd, SW_SHOW);
     UpdateWindow(hwnd);
+
+    core::printf("[System] Win32 window shown.\n");
     
     g_window.hwnd = hwnd;
     g_window.width = width;

@@ -24,6 +24,8 @@ struct PlatformWindow {
 static GraphicsContext* __linux_init_graphics(PlatformWindow* window) noexcept {
     if (!window || !window->display || !window->window) return nullptr;
 
+    core::printf("[System] GLX renderer init start.\n");
+
     int visual_attribs[] = {
         GLX_RGBA,
         GLX_DEPTH_SIZE, 24,
@@ -34,12 +36,19 @@ static GraphicsContext* __linux_init_graphics(PlatformWindow* window) noexcept {
     XVisualInfo* vi = glXChooseVisual(window->display, DefaultScreen(window->display), visual_attribs);
     if (!vi) return nullptr;
 
+    core::printf("[System] GLX visual selected.\n");
+
     GLXContext glx_context = glXCreateContext(window->display, vi, nullptr, GL_TRUE);
     if (!glx_context) return nullptr;
 
+    core::printf("[System] GLX context created.\n");
+
     glXMakeCurrent(window->display, window->window, glx_context);
 
+    core::printf("[System] GLX context current.\n");
+
     g_context.glx_context = glx_context;
+    core::printf("[System] GLX renderer init complete.\n");
     return &g_context;
 }
 

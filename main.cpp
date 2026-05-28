@@ -11,6 +11,8 @@
 #include "platform/platform_linux.cpp"
 #endif
 
+#define FOREST_TILESET_PATH "assets/tilesets/forest.bmp"
+
 PlatformApi api;
 
 #if defined(OS_LINUX)
@@ -89,9 +91,12 @@ MAIN {
     environ = envp;
 #endif
 
-    platform_init(&api);
+    core::printf("[System] Booting...\n");
 
-    core::printf("[System] Initializing window and graphics context...\n");
+    platform_init(&api);
+    core::printf("[System] Platform API initialized.\n");
+
+    core::printf("[System] Creating window (800x600)...\n");
 
     PlatformWindow* windowptr = api.window.create("Unnamed Game", 800, 600);
     if (!windowptr) {
@@ -99,6 +104,9 @@ MAIN {
         core::exit(1);
     }
 
+    core::printf("[System] Window created: %p\n", windowptr);
+
+    core::printf("[System] Initializing renderer...\n");
     GraphicsContext* context = api.render.init(windowptr);
     if (!context) {
         core::printf("[Error] Failed to initialize graphics context!\n");
@@ -106,7 +114,11 @@ MAIN {
         core::exit(1);
     }
 
-    LoadedImage atlas_image = api.media.load_bmp("assets/tilesets/forest.bmp");
+    core::printf("[System] Renderer initialized.\n");
+
+    core::printf("[System] Loading texture atlas: %s\n", FOREST_TILESET_PATH);
+    LoadedImage atlas_image = api.media.load_bmp(FOREST_TILESET_PATH);
+
     if (!atlas_image.pixels) {
         core::printf(
             "[Error] Failed to load forest tileset image from disk!\n"
@@ -116,6 +128,13 @@ MAIN {
         core::exit(1);
     }
 
+    core::printf(
+        "[System] Texture atlas loaded (%dx%d).\n",
+        atlas_image.width,
+        atlas_image.height
+    );
+
+    core::printf("[System] Uploading texture to GPU...\n");
     b8 upload_success = api.render.upload_texture(
         context,
         atlas_image.pixels,
@@ -133,6 +152,8 @@ MAIN {
         api.window.destroy(windowptr);
         core::exit(1);
     }
+
+    core::printf("[System] Texture upload complete.\n");
 
     // Define 32x32 texture region slices from the 384x256 forest tileset
     // Grass Variation A (Row 5, Column 1): x=0, y=128

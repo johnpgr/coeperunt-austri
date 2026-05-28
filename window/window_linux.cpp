@@ -18,6 +18,7 @@ struct PlatformWindow {
 static PlatformWindow g_window = {};
 
 static PlatformWindow* __linux_create_window(const char* title, i32 width, i32 height) noexcept {
+    core::printf("[System] X11 window init start (%dx%d).\n", width, height);
     Display* display = XOpenDisplay(nullptr);
     if (!display) {
         return nullptr;
@@ -35,6 +36,8 @@ static PlatformWindow* __linux_create_window(const char* title, i32 width, i32 h
         XCloseDisplay(display);
         return nullptr;
     }
+
+    core::printf("[System] X11 visual selected.\n");
 
     Colormap cmap = XCreateColormap(display, RootWindow(display, vi->screen), vi->visual, AllocNone);
 
@@ -55,6 +58,8 @@ static PlatformWindow* __linux_create_window(const char* title, i32 width, i32 h
     XSetWMProtocols(display, window, &wm_delete_window, 1);
 
     XMapWindow(display, window);
+
+    core::printf("[System] X11 window created and mapped.\n");
 
     g_window.display = display;
     g_window.window = window;
