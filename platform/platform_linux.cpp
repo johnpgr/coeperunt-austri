@@ -37,10 +37,8 @@ NORETURN void exit(i32 status) noexcept {
     while (1) {} // Guarantee termination
 }
 
-void print(const char* message) noexcept {
-    if (!message)
-        return;
-    usize len = core::strlen(message);
+void print_raw(const char* message, usize len) noexcept {
+    if (!message || len == 0) return;
     sys::write(2, message, len);
 }
 
@@ -48,12 +46,14 @@ void printv(const char* format, va_list args) noexcept {
     char buf[16384];
     va_list args_copy;
     va_copy(args_copy, args);
-    core::vsnprintf(buf, sizeof(buf), format, args_copy);
+    i32 len = core::vsnprintf(buf, sizeof(buf), format, args_copy);
     va_end(args_copy);
-    core::print(buf);
+    if (len > 0) {
+        core::print_raw(buf, (usize)len);
+    }
 }
 
-void printf(const char* format, ...) noexcept {
+void printf_ptr(const char* format, ...) noexcept {
     va_list args;
     va_start(args, format);
     core::printv(format, args);

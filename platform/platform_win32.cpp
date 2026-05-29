@@ -39,9 +39,18 @@ void exit(i32 status) noexcept {
     while (1) {} // Guarantee termination
 }
 
-void print(const char* message) noexcept {
-    if (message) {
-        OutputDebugStringA(message);
+void print_raw(const char* message, usize len) noexcept {
+    if (!message || len == 0) return;
+    const usize chunk_size = 1023;
+    char buf[1024];
+    usize offset = 0;
+    while (offset < len) {
+        usize to_copy = len - offset;
+        if (to_copy > chunk_size) to_copy = chunk_size;
+        core::memcpy(buf, message + offset, to_copy);
+        buf[to_copy] = '\0';
+        OutputDebugStringA(buf);
+        offset += to_copy;
     }
 }
 
@@ -49,12 +58,14 @@ void printv(const char* format, va_list args) noexcept {
     char buf[2048];
     va_list args_copy;
     va_copy(args_copy, args);
-    core::vsnprintf(buf, sizeof(buf), format, args_copy);
+    i32 len = core::vsnprintf(buf, sizeof(buf), format, args_copy);
     va_end(args_copy);
-    core::print(buf);
+    if (len > 0) {
+        core::print_raw(buf, (usize)len);
+    }
 }
 
-void printf(const char* format, ...) noexcept {
+void printf_ptr(const char* format, ...) noexcept {
     va_list args;
     va_start(args, format);
     core::printv(format, args);
