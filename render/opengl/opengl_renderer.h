@@ -112,8 +112,14 @@ typedef __PTRDIFF_TYPE__ GLintptr;
     X(glGetIntegerv, void, (GLenum pname, GLint* data))
 
 // Declare function pointer typedefs and extern variables
+#if defined(OS_WINDOWS)
+    #define GL_APIENTRY __stdcall
+#else
+    #define GL_APIENTRY
+#endif
+
 #define X(name, ret, params) \
-    typedef ret (__stdcall *PFN_##name) params; \
+    typedef ret (GL_APIENTRY *PFN_##name) params; \
     extern PFN_##name name;
 OPENGL_PROC_LIST
 #undef X

@@ -3,37 +3,10 @@
 
 #include "../win32.h"
 
-#pragma pack(push, 1)
-struct BMPHeader {
-    u16 signature;
-    u32 file_size;
-    u16 reserved1;
-    u16 reserved2;
-    u32 data_offset;
-};
-
-struct BMPInfoHeader {
-    u32 size;
-    i32 width;
-    i32 height;
-    u16 planes;
-    u16 bit_count;
-    u32 compression;
-    u32 image_size;
-    i32 x_pixels_per_m;
-    i32 y_pixels_per_m;
-    u32 colors_used;
-    u32 colors_important;
-};
-#pragma pack(pop)
-
 LoadedImage win32_load_bmp(const char* filepath) noexcept {
     LoadedImage result = {};
 
     MemoryArena temp_arena = arena_alloc(Megabytes(32));
-    if (!temp_arena.base) {
-        return result;
-    }
 
     Path path = path_parse(&temp_arena, str8_cstring(filepath));
     String8 file = api.fs.read_entire_file(&temp_arena, path);

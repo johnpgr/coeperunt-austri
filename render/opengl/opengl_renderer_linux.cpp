@@ -1,8 +1,5 @@
 #include "opengl_renderer.h"
-
-#include <X11/Xlib.h>
-#include <GL/glx.h>
-#include <dlfcn.h>
+#include "glx/glx_linux.h"
 
 // ============================================================================
 // OpenGL X-Macro Function Pointer Instantiation
@@ -14,19 +11,9 @@ OPENGL_PROC_LIST
 static void opengl_load_symbols() noexcept {
     if (glGenBuffers != nullptr) return; // Already loaded
 
-    void* opengl_lib = dlopen("libGL.so.1", RTLD_LAZY);
-    if (!opengl_lib) {
-        opengl_lib = dlopen("libGL.so", RTLD_LAZY);
-    }
-    if (!opengl_lib) {
-        core::printf("[Error] Failed to load libGL.so\n");
+    if (!glx_load_symbols()) {
+        core::printf("[Error] GLX symbols not loaded.\n");
         return;
-    }
-
-    typedef void* (*PFN_glXGetProcAddress)(const char*);
-    PFN_glXGetProcAddress glXGetProcAddress_ptr = (PFN_glXGetProcAddress)dlsym(opengl_lib, "glXGetProcAddressARB");
-    if (!glXGetProcAddress_ptr) {
-        glXGetProcAddress_ptr = (PFN_glXGetProcAddress)dlsym(opengl_lib, "glXGetProcAddress");
     }
 
     #define X(name, ret, params) \
@@ -34,7 +21,7 @@ static void opengl_load_symbols() noexcept {
             name = (PFN_##name)glXGetProcAddress_ptr(#name); \
         } \
         if (name == nullptr) { \
-            name = (PFN_##name)dlsym(opengl_lib, #name); \
+            name = (PFN_##name)glx_dlsym(#name); \
         }
     OPENGL_PROC_LIST
     #undef X
@@ -92,6 +79,10 @@ EXTERN_C GraphicsContext* __opengl_init_graphics(PlatformWindow* window) noexcep
 
     // Load dynamic libraries
     opengl_load_symbols();
+    if (!glXChooseVisual || !glXCreateContext || !glXMakeCurrent || !glXSwapBuffers || !glXDestroyContext) {
+        core::printf("[Error] GLX symbols not loaded.\n");
+        return nullptr;
+    }
 
     Display* display = *(Display**)window;
     Window win = *(Window*)((char*)window + sizeof(Display*));

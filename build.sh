@@ -24,7 +24,7 @@ if [[ "$OS_NAME" == *"MINGW"* || "$OS_NAME" == *"MSYS"* || "$OS_NAME" == *"CYGWI
     OUTPUT_BIN="${OUTPUT_NAME}.exe"
 else
     echo "Configuring build for Linux (ELF Binary)..."
-    LINKER_FLAGS="-Wl,-e,_start -lX11 -lGL -lc"
+    LINKER_FLAGS="-Wl,-e,_start -lX11 -lc"
     OUTPUT_BIN="${OUTPUT_NAME}"
 fi
 echo "----------------------------------------"

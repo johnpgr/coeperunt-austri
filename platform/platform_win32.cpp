@@ -36,8 +36,7 @@ namespace core {
 NORETURN 
 void exit(i32 status) noexcept {
     ExitProcess((u32)status);
-    while (1) {
-    } // Guarantee termination
+    while (1) {} // Guarantee termination
 }
 
 void print(const char* message) noexcept {

@@ -2,7 +2,8 @@
 
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
-#include <GL/glx.h>
+
+#include "../../render/opengl/glx/glx_linux.h"
 
 struct PlatformWindow {
     Display* display;
@@ -22,8 +23,14 @@ static PlatformWindow g_window = {};
 
 static PlatformWindow* __linux_create_window(const char* title, i32 width, i32 height) noexcept {
     core::printf("[System] X11 window init start (%dx%d).\n", width, height);
+
     Display* display = XOpenDisplay(nullptr);
     if (!display) {
+        return nullptr;
+    }
+
+    if (!glx_load_symbols()) {
+        XCloseDisplay(display);
         return nullptr;
     }
 
@@ -87,6 +94,7 @@ static void __linux_destroy_window(PlatformWindow* window) noexcept {
         XCloseDisplay(window->display);
         window->display = nullptr;
     }
+    glx_unload_symbols();
 }
 
 static b8 __linux_poll_events(PlatformWindow* window) noexcept {

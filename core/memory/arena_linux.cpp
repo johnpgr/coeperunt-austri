@@ -6,11 +6,9 @@ MemoryArena arena_alloc(usize size) noexcept {
         return arena;
     }
 
-    // Note: __syscall6, SYS_MMAP, etc. are available in the unity build context
-    void* base = (void*)__syscall6(
-        SYS_MMAP,
-        0,
-        (i64)size,
+    void* base = sys::mmap(
+        nullptr,
+        size,
         LINUX_PROT_READ | LINUX_PROT_WRITE,
         LINUX_MAP_PRIVATE | LINUX_MAP_ANONYMOUS,
         -1,
@@ -27,7 +25,7 @@ MemoryArena arena_alloc(usize size) noexcept {
 
 void arena_release(MemoryArena* arena) noexcept {
     if (arena && arena->base && arena->size > 0) {
-        __syscall2(SYS_MUNMAP, (i64)arena->base, (i64)arena->size);
+        sys::munmap(arena->base, arena->size);
         arena->base = nullptr;
         arena->size = 0;
         arena->used = 0;
