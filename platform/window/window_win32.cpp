@@ -1,12 +1,5 @@
-#include "../platform/platform.h"
-
-#if defined(OS_WINDOWS)
-
-#define NOMINMAX
-#define WIN32_LEAN_AND_MEAN
-// TODO(maybe): Remove windows.h import and load the win32 library functions dynamically
-#include <windows.h>
-#include <windowsx.h>
+#include "../platform.h"
+#include "../win32.h"
 
 struct PlatformWindow {
     HWND hwnd;
@@ -27,7 +20,7 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
         case WM_CLOSE:
         case WM_DESTROY: {
             g_window.should_close = true;
-            PostQuitMessage(0);
+            win32::PostQuitMessage(0);
             return 0;
         } break;
         
@@ -45,29 +38,29 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 
         case WM_LBUTTONDOWN: {
             g_window.mouse_left_down = true;
-            SetCapture(hwnd);
+            win32::SetCapture(hwnd);
             return 0;
         } break;
 
         case WM_LBUTTONUP: {
             g_window.mouse_left_down = false;
-            ReleaseCapture();
+            win32::ReleaseCapture();
             return 0;
         } break;
 
         case WM_RBUTTONDOWN: {
             g_window.mouse_right_down = true;
-            SetCapture(hwnd);
+            win32::SetCapture(hwnd);
             return 0;
         } break;
 
         case WM_RBUTTONUP: {
             g_window.mouse_right_down = false;
-            ReleaseCapture();
+            win32::ReleaseCapture();
             return 0;
         } break;
     }
-    return DefWindowProcA(hwnd, uMsg, wParam, lParam);
+    return win32::DefWindowProcA(hwnd, uMsg, wParam, lParam);
 }
 
 static PlatformWindow* __win32_create_window(const char* title, i32 width, i32 height) noexcept {
@@ -79,20 +72,20 @@ static PlatformWindow* __win32_create_window(const char* title, i32 width, i32 h
     wc.style = CS_HREDRAW | CS_VREDRAW;
     wc.lpfnWndProc = WindowProc;
     wc.hInstance = hinstance;
-    wc.hCursor = LoadCursorA(nullptr, (LPCSTR)IDC_ARROW);
+    wc.hCursor = win32::LoadCursorA(nullptr, (LPCSTR)IDC_ARROW);
     wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
     wc.lpszClassName = "UnnamedGameWindowClass";
     
-    if (!RegisterClassExA(&wc)) {
+    if (!win32::RegisterClassExA(&wc)) {
         return nullptr;
     }
 
     core::printf("[System] Win32 window class registered.\n");
     
     RECT wr = { 0, 0, width, height };
-    AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE);
+    win32::AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE);
     
-    HWND hwnd = CreateWindowExA(
+    HWND hwnd = win32::CreateWindowExA(
         0,
         wc.lpszClassName,
         title,
@@ -109,9 +102,9 @@ static PlatformWindow* __win32_create_window(const char* title, i32 width, i32 h
 
     core::printf("[System] Win32 window created.\n");
     
-    ShowWindow(hwnd, SW_SHOW);
-    UpdateWindow(hwnd);
-
+    win32::ShowWindow(hwnd, SW_SHOW);
+    win32::UpdateWindow(hwnd);
+ 
     core::printf("[System] Win32 window shown.\n");
     
     g_window.hwnd = hwnd;
@@ -128,7 +121,7 @@ static PlatformWindow* __win32_create_window(const char* title, i32 width, i32 h
 
 static void __win32_destroy_window(PlatformWindow* window) noexcept {
     if (window && window->hwnd) {
-        DestroyWindow(window->hwnd);
+        win32::DestroyWindow(window->hwnd);
         window->hwnd = nullptr;
     }
 }
@@ -138,9 +131,9 @@ static b8 __win32_poll_events(PlatformWindow* window) noexcept {
     
     MSG msg = {};
     b8 got_events = false;
-    while (PeekMessageA(&msg, nullptr, 0, 0, PM_REMOVE)) {
-        TranslateMessage(&msg);
-        DispatchMessageA(&msg);
+    while (win32::PeekMessageA(&msg, nullptr, 0, 0, PM_REMOVE)) {
+        win32::TranslateMessage(&msg);
+        win32::DispatchMessageA(&msg);
         got_events = true;
     }
     
@@ -154,5 +147,3 @@ static b8 __win32_poll_events(PlatformWindow* window) noexcept {
     
     return got_events;
 }
-
-#endif // OS_WINDOWS

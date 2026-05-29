@@ -1,6 +1,4 @@
-#include "../platform/platform.h"
-
-#if defined(OS_LINUX)
+#include "../platform.h"
 
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
@@ -99,7 +97,7 @@ static b8 __linux_poll_events(PlatformWindow* window) noexcept {
         XEvent event;
         XNextEvent(window->display, &event);
         got_events = true;
-
+ 
         switch (event.type) {
             case ConfigureNotify: {
                 window->width = event.xconfigure.width;
@@ -145,5 +143,3 @@ static b8 __linux_poll_events(PlatformWindow* window) noexcept {
     
     return got_events;
 }
-
-#endif // OS_LINUX

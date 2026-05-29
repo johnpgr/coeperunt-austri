@@ -20,7 +20,7 @@ echo "Detected Host OS: $OS_NAME"
 
 if [[ "$OS_NAME" == *"MINGW"* || "$OS_NAME" == *"MSYS"* || "$OS_NAME" == *"CYGWIN"* ]]; then
     echo "Configuring build for Windows (PE Binary)..."
-    LINKER_FLAGS="-Wl,-entry:no_crt_entry -Wl,-subsystem:windows -lkernel32 -luser32"
+    LINKER_FLAGS="-Wl,-entry:no_crt_entry -Wl,-subsystem:windows -lkernel32"
     OUTPUT_BIN="${OUTPUT_NAME}.exe"
 else
     echo "Configuring build for Linux (ELF Binary)..."

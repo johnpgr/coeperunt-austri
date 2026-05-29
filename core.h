@@ -6,7 +6,6 @@
 // ============================================================================
 #if defined(_WIN32)
     #define OS_WINDOWS
-    #pragma comment(lib, "kernel32.lib")
 #elif defined(__linux__)
     #define OS_LINUX
 #else
@@ -37,42 +36,26 @@ typedef __PTRDIFF_TYPE__   isize;
 typedef bool               b8;
 typedef int                b32;
 
-// ============================================================================
-// Memory Arena (Linear Allocator)
-// ============================================================================
-struct MemoryArena {
-    u8* base;
-    usize size;
-    usize used;
-};
+#define Kilobytes(val) ((val)*1024ULL)
+#define Megabytes(val) (Kilobytes(val)*1024ULL)
+#define Gigabytes(val) (Megabytes(val)*1024ULL)
+#define Terabytes(val) (Gigabytes(val)*1024ULL)
 
-#define push_struct(arena, type) (type *)push_size_(arena, sizeof(type))
-#define push_array(arena, count, type) (type *)push_size_(arena, (count) * sizeof(type))
+#define internal        static
+#define local_persist   static
+#define global          static
 
-inline void*
-push_size_(MemoryArena* arena, usize size) {
-    if (!arena || !arena->base || size == 0) {
-        return 0;
-    }
-
-    if (arena->used + size > arena->size) {
-        return 0;
-    }
-
-    void* result = arena->base + arena->used;
-    arena->used += size;
-    return result;
-}
+#if DEBUG
+#define assert(expression) if(!(expression)) { *(volatile int *)0 = 0; }
+#else
+#define assert(expression)
+#endif
 
 // ============================================================================
 // Custom String Utilities, Trigonometrics, Memory & IO (Freestanding core namespace)
 // ============================================================================
 
 namespace core {
-    /**
-     * TODO: Create our own String type, that does not heap allocate and
-     * that is going to be O(1) for length retrieval, and O(1) for slicing (substrings).
-     */
     inline constexpr usize strlen(const char* str) {
         usize len = 0;
         while (str && str[len] != '\0') {
@@ -337,7 +320,27 @@ namespace core {
         *p = '\0';
         return (i32)(p - buf);
     }
+
+    inline i32 sprintf(char* buf, const char* format, ...) noexcept {
+        va_list args;
+        va_start(args, format);
+        i32 result = core::vsnprintf(buf, Megabytes(1), format, args);
+        va_end(args);
+        return result;
+    }
+
+    inline i32 snprintf(char* buf, usize buf_size, const char* format, ...) noexcept {
+        va_list args;
+        va_start(args, format);
+        i32 result = core::vsnprintf(buf, buf_size, format, args);
+        va_end(args);
+        return result;
+    }
 }
+
+#include "core/memory/arena.h"
+#include "core/string8.h"
+#include "core/path.h"
 
 #endif // CORE_H
 

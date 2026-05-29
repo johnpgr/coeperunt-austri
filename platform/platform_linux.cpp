@@ -1,6 +1,6 @@
 #include "platform.h"
 
-#if defined(OS_LINUX)
+EXTERN_C char** environ = nullptr;
 
 #if defined(__x86_64__)
 __asm__(".global _start\n"
@@ -10,6 +10,7 @@ __asm__(".global _start\n"
         "movq %rdi, %rax\n"
         "shlq $3, %rax\n"            // argc * 8
         "leaq 16(%rsp,%rax), %rdx\n" // envp = &argv[argc + 1]
+        "movq %rdx, environ(%rip)\n" // Store envp in global environ
         "call nomain_entry\n"
         "hlt\n");
 #elif defined(__aarch64__)
@@ -19,6 +20,8 @@ __asm__(".global _start\n"
         "add x1, sp, #8\n"         // argv = sp + 8
         "add x2, x0, #1\n"         // argc + 1
         "add x2, x1, x2, lsl #3\n" // envp = argv + (argc + 1) * 8
+        "adrp x3, environ\n"
+        "str x2, [x3, #:lo12:environ]\n"
         "bl nomain_entry\n");
 #endif
 
@@ -236,187 +239,12 @@ void printf(const char* format, ...) noexcept {
 
 } // namespace core
 
-// ============================================================================
-// File System Implementation (Linux)
-// ============================================================================
-static MemoryArena __linux_arena_alloc(usize size) noexcept {
-    MemoryArena arena = {};
-    if (size == 0) {
-        return arena;
-    }
-
-    void* base = (void*)__syscall6(
-        SYS_MMAP,
-        0,
-        (i64)size,
-        LINUX_PROT_READ | LINUX_PROT_WRITE,
-        LINUX_MAP_PRIVATE | LINUX_MAP_ANONYMOUS,
-        -1,
-        0
-    );
-
-    if (base != LINUX_MAP_FAILED) {
-        arena.base = (u8*)base;
-        arena.size = size;
-    }
-    return arena;
-}
-
-static void __linux_arena_release(MemoryArena* arena) noexcept {
-    if (arena && arena->base && arena->size > 0) {
-        __syscall2(SYS_MUNMAP, (i64)arena->base, (i64)arena->size);
-        arena->base = 0;
-        arena->size = 0;
-        arena->used = 0;
-    }
-}
-
-static FileContent __linux_read_entire_file(const char* filepath) noexcept {
-    FileContent result = {};
-    if (!filepath) {
-        return result;
-    }
-
-    i64 fd = __syscall4(
-        SYS_OPENAT,
-        LINUX_AT_FDCWD,
-        (i64)filepath,
-        LINUX_O_RDONLY,
-        0
-    );
-    if (fd < 0) {
-        core::printf("[Error] Failed to open file: %s\n", filepath);
-        return result;
-    }
-
-    i64 file_size = __syscall3(SYS_LSEEK, fd, 0, LINUX_SEEK_END);
-    if (file_size <= 0) {
-        __syscall1(SYS_CLOSE, fd);
-        return result;
-    }
-
-    if (__syscall3(SYS_LSEEK, fd, 0, LINUX_SEEK_SET) < 0) {
-        core::printf("[Error] Failed to seek file: %s\n", filepath);
-        __syscall1(SYS_CLOSE, fd);
-        return result;
-    }
-
-    if ((u64)file_size > (u64)(usize)-1) {
-        core::printf("[Error] File size overflow: %s\n", filepath);
-        __syscall1(SYS_CLOSE, fd);
-        return result;
-    }
-
-    usize size        = (usize)file_size;
-    MemoryArena arena = __linux_arena_alloc(size);
-    if (!arena.base) {
-        core::printf("[Error] Failed to allocate file arena: %s\n", filepath);
-        __syscall1(SYS_CLOSE, fd);
-        return result;
-    }
-
-    void* data = push_size_(&arena, size);
-    if (!data) {
-        __linux_arena_release(&arena);
-        __syscall1(SYS_CLOSE, fd);
-        return result;
-    }
-
-    u8* dest        = (u8*)data;
-    usize remaining = size;
-    while (remaining > 0) {
-        i64 read_count = __syscall3(SYS_READ, fd, (i64)dest, (i64)remaining);
-        if (read_count <= 0) {
-            core::printf("[Error] Failed to read file content: %s\n", filepath);
-            break;
-        }
-        dest      += (usize)read_count;
-        remaining -= (usize)read_count;
-    }
-
-    __syscall1(SYS_CLOSE, fd);
-    if (remaining != 0) {
-        __linux_arena_release(&arena);
-        return result;
-    }
-
-    result.data             = data;
-    result.size             = size;
-    result.file_memory      = arena.base;
-    result.file_memory_size = arena.size;
-    return result;
-}
-
-static b8 __linux_write_entire_file(
-    const char* filepath,
-    const void* data,
-    usize size
-) noexcept {
-    if (!filepath || (!data && size > 0)) {
-        return false;
-    }
-
-    i64 fd = __syscall4(
-        SYS_OPENAT,
-        LINUX_AT_FDCWD,
-        (i64)filepath,
-        LINUX_O_WRONLY | LINUX_O_CREAT | LINUX_O_TRUNC,
-        0644
-    );
-
-    if (fd < 0) {
-        core::printf("[Error] Failed to open file for writing: %s\n", filepath);
-        return false;
-    }
-
-    usize total_written = 0;
-    const u8* src       = (const u8*)data;
-    while (total_written < size) {
-        i64 write_count = __syscall3(
-            SYS_WRITE,
-            fd,
-            (i64)(src + total_written),
-            (i64)(size - total_written)
-        );
-
-        if (write_count <= 0) {
-            core::printf(
-                "[Error] Failed to write file content: %s\n",
-                filepath
-            );
-            break;
-        }
-
-        total_written += (usize)write_count;
-    }
-
-    __syscall1(SYS_CLOSE, fd);
-    return (total_written == size);
-}
-
-static void __linux_free_file_content(FileContent content) noexcept {
-    if (content.file_memory && content.file_memory_size > 0) {
-        MemoryArena arena = {};
-        arena.base        = (u8*)content.file_memory;
-        arena.size        = content.file_memory_size;
-        __linux_arena_release(&arena);
-    }
-}
-
-// ============================================================================
-// Media Stubs (Linux)
-// ============================================================================
-static LoadedImage __linux_load_bmp(const char* filepath) noexcept {
-    LoadedImage result = {};
-    return result;
-}
-
-static void __linux_free_bmp(LoadedImage image) noexcept {
-}
-
 // Physically separate implementations included in Unity Build order
-#include "../window/window_linux.cpp"
-#include "../render/render_linux.cpp"
+#include "../core/memory/arena_linux.cpp"
+#include "fs/fs_linux.cpp"
+#include "media/media_linux.cpp"
+#include "window/window_linux.cpp"
+#include "../render/opengl/opengl_renderer_linux.cpp"
 
 void platform_init(PlatformApi* api) noexcept {
     if (api) {
@@ -424,18 +252,15 @@ void platform_init(PlatformApi* api) noexcept {
         api->window.destroy = __linux_destroy_window;
         api->window.poll    = __linux_poll_events;
 
-        api->render.init           = __linux_init_graphics;
-        api->render.upload_texture = __linux_upload_texture;
-        api->render.submit_frame   = __linux_submit_frame;
-        api->render.destroy        = __linux_destroy_graphics;
+        api->render.init           = __opengl_init_graphics;
+        api->render.upload_texture = __opengl_upload_texture;
+        api->render.submit_frame   = __opengl_submit_frame;
+        api->render.destroy        = __opengl_destroy_graphics;
 
-        api->fs.read_entire_file  = __linux_read_entire_file;
-        api->fs.write_entire_file = __linux_write_entire_file;
-        api->fs.free_file_content = __linux_free_file_content;
+        api->fs.read_entire_file  = linux_read_entire_file;
+        api->fs.write_entire_file = linux_write_entire_file;
 
-        api->media.load_bmp = __linux_load_bmp;
-        api->media.free_bmp = __linux_free_bmp;
+        api->media.load_bmp = linux_load_bmp;
+        api->media.free_bmp = linux_free_bmp;
     }
 }
-
-#endif // OS_LINUX

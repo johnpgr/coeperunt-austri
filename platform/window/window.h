@@ -1,7 +1,7 @@
-#ifndef WINDOW_H
-#define WINDOW_H
+#ifndef PLATFORM_WINDOW_H
+#define PLATFORM_WINDOW_H
 
-#include "../core.h"
+#include "../../core.h"
 
 // Opaque type for SystemWindow
 typedef struct PlatformWindow PlatformWindow;
@@ -12,6 +12,4 @@ typedef struct WindowApi {
     b8 (*poll)(PlatformWindow* window) noexcept;
 } WindowApi;
 
-EXTERN_C void window_init(WindowApi* window) noexcept;
-
-#endif // WINDOW_H
+#endif // PLATFORM_WINDOW_H

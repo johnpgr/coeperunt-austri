@@ -2,27 +2,14 @@
 #define PLATFORM_H
 
 #include "../core.h"
+#include "fs/fs.h"
+#include "media/media.h"
+#include "window/window.h"
+#include "../render/render.h"
 
 // Opaque types
 typedef struct PlatformWindow PlatformWindow;
 typedef struct GraphicsContext GraphicsContext;
-
-// Data structures
-typedef struct LoadedImage {
-    u8* pixels;
-    i32 width;
-    i32 height;
-    void* file_memory;
-} LoadedImage;
-
-typedef struct FileContent {
-    void* data;
-    usize size;
-    void* file_memory;
-    usize file_memory_size;
-} FileContent;
-
-#include "../render/render.h"
 
 // ============================================================================
 // Central Platform API Definition
@@ -51,23 +38,9 @@ typedef struct PlatformApi {
         } keyboard;
     } input;
 
-    struct {
-        GraphicsContext* (*init)(PlatformWindow* window) noexcept;
-        b8 (*upload_texture)(GraphicsContext* context, const u8* pixels, i32 width, i32 height) noexcept;
-        void (*submit_frame)(PlatformWindow* window, GraphicsContext* context, RenderCommandQueue queue) noexcept;
-        void (*destroy)(GraphicsContext* context) noexcept;
-    } render;
-
-    struct {
-        FileContent (*read_entire_file)(const char* filepath) noexcept;
-        b8 (*write_entire_file)(const char* filepath, const void* data, usize size) noexcept;
-        void (*free_file_content)(FileContent content) noexcept;
-    } fs;
-
-    struct {
-        LoadedImage (*load_bmp)(const char* filepath) noexcept;
-        void (*free_bmp)(LoadedImage image) noexcept;
-    } media;
+    RenderApi render;
+    FsApi fs;
+    MediaApi media;
 } PlatformApi;
 
 // Global instance definition

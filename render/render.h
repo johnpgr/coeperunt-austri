@@ -2,7 +2,7 @@
 #define RENDER_H
 
 #include "../core.h"
-#include "../window/window.h"
+#include "../platform/window/window.h"
 
 // Opaque type for GraphicsContext
 typedef struct GraphicsContext GraphicsContext;

@@ -4,6 +4,7 @@
  */
 
 #include "core.h"
+#include "core/path.cpp"
 
 #if defined(OS_WINDOWS)
 #include "platform/platform_win32.cpp"
@@ -19,17 +20,7 @@ PlatformApi api;
 #include "tiles.h"
 #include "tiles.cpp"
 
-#if defined(OS_LINUX)
-EXTERN_C char** environ;
-#endif
-
 MAIN {
-#if defined(OS_LINUX)
-    environ = envp;
-#endif
-
-    core::printf("[System] Booting...\n");
-
     platform_init(&api);
     core::printf("[System] Platform API initialized.\n");
 
@@ -113,7 +104,7 @@ MAIN {
     autotile_init(SPRITE_DIRT);
     autotile_setup_rules();
 
-    static u8 render_command_buffer[1024 * 1024];
+    static u8 render_command_buffer[Megabytes(1)];
     RenderCommandQueue queue = {};
     queue.buffer             = render_command_buffer;
     queue.capacity           = sizeof(render_command_buffer);
